@@ -1,0 +1,11 @@
+id,text,label,split,annotator,source
+r1,The battery died after two days,negative,train,priya,mobile-app
+r2,The battery died after two days,negative,test,marco,mobile-app
+r3,Absolutely love this phone,positive,train,priya,web-form
+r4,Screen cracked on first drop,negative,train,priya,mobile-app
+r5,Screen cracked on first drop,positive,train,marco,mobile-app
+r6,Great value for the price,positive,train,priya,web-form
+r7,Great value for the price!,positive,train,marco,web-form
+r8,Fast shipping and well packed,positive,train,priya,web-form
+r9,Would not recommend to anyone,negative,train,marco,mobile-app
+r10,Does exactly what it says,positive,test,priya,web-form
