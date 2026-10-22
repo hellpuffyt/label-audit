@@ -129,3 +129,37 @@ class TestFindings:
             ]
         )
         assert agreement.findings(agreement.analyse(data)) == []
+
+
+# --- audit regressions ----------------------------------------------------
+
+
+def test_fleiss_kappa_matches_the_published_worked_example() -> None:
+    # Fleiss (1971) example as reproduced on Wikipedia: 10 subjects,
+    # 14 raters, 5 categories -> kappa = 0.210.
+    table = [
+        [0, 0, 0, 0, 14], [0, 2, 6, 4, 2], [0, 0, 3, 5, 6], [0, 3, 9, 2, 0],
+        [2, 2, 8, 1, 1], [7, 7, 0, 0, 0], [3, 2, 6, 3, 0], [2, 5, 3, 2, 2],
+        [6, 5, 2, 1, 0], [0, 2, 2, 3, 7],
+    ]  # fmt: skip
+    sets = [[str(c) for c, k in enumerate(r) for _ in range(k)] for r in table]
+    kappa = agreement.fleiss_kappa(sets)
+    assert kappa is not None
+    assert round(kappa, 3) == 0.210
+
+
+def test_an_annotator_repeating_an_item_does_not_agree_with_themselves() -> None:
+    # p labelled items 1 and 2 twice each; only item 3 has two raters.
+    data = Dataset(
+        [
+            row("1", "a", annotator="p"),
+            row("1", "a", annotator="p"),
+            row("2", "b", annotator="p"),
+            row("2", "b", annotator="p"),
+            row("3", "a", annotator="p"),
+            row("3", "b", annotator="q"),
+        ]
+    )
+    report = agreement.analyse(data)
+    assert report.multi_annotated_items == 1
+    assert report.observed_agreement == 0.0

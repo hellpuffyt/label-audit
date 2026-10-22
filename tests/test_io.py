@@ -105,3 +105,28 @@ class TestDispatch:
     def test_missing_file_reports_the_path(self, tmp_path: Path) -> None:
         with pytest.raises(DatasetFormatError, match="cannot read"):
             io.load(tmp_path / "absent.csv")
+
+
+def test_repeated_header_column_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(DatasetFormatError, match="repeats column"):
+        io.load(write(tmp_path / "d.csv", "id,text,label,label\n1,x,a,b\n"))
+
+
+def test_undecodable_csv_is_a_format_error(tmp_path: Path) -> None:
+    path = tmp_path / "d.csv"
+    path.write_bytes(b"id,text,label\n1,\xff,a\n")
+    with pytest.raises(DatasetFormatError, match="not valid UTF-8"):
+        io.load(path)
+
+
+def test_undecodable_jsonl_is_a_format_error(tmp_path: Path) -> None:
+    path = tmp_path / "d.jsonl"
+    path.write_bytes(b'{"id": "1", "text": "\xff", "label": "a"}\n')
+    with pytest.raises(DatasetFormatError, match="not valid UTF-8"):
+        io.load(path)
+
+
+def test_oversized_field_is_a_format_error(tmp_path: Path) -> None:
+    path = write(tmp_path / "d.csv", "id,text,label\n1," + "y" * 200_000 + ",a\n")
+    with pytest.raises(DatasetFormatError, match="malformed CSV"):
+        io.load(path)

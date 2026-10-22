@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Fixed: an annotator labelling the same item twice was counted as two raters,
+  inflating observed agreement and Fleiss' kappa.
+- Fixed: a CSV header repeating a column name (e.g. two `label` columns)
+  silently used the last one; it is now refused.
+- Fixed: non-UTF-8 input and oversized CSV fields crashed with a traceback
+  instead of exit code 1.
+- Docs: README example replaced with real output for `examples/reviews.csv`;
+  install from source. Added Fleiss worked-example test, `SECURITY.md`,
+  `.editorconfig`, `docs/PRODUCTION_READINESS.md`.
+
 ## 0.1.0 — 2026-09-01
 
 Initial release.
