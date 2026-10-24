@@ -63,6 +63,14 @@ def _load_csv(path: Path) -> Dataset:
             reader = csv.DictReader(handle)
             if reader.fieldnames is None:
                 raise DatasetFormatError(f"{path.name}: file is empty")
+            named = [name for name in reader.fieldnames if name]
+            repeated = sorted({name for name in named if named.count(name) > 1})
+            if repeated:
+                # DictReader keeps only the last same-named column, so a
+                # second "label" column would silently replace the first.
+                raise DatasetFormatError(
+                    f"{path.name}: header repeats column(s): {', '.join(repeated)}"
+                )
             missing = [name for name in REQUIRED if name not in reader.fieldnames]
             if missing:
                 raise DatasetFormatError(
@@ -74,6 +82,10 @@ def _load_csv(path: Path) -> Dataset:
                 rows.append(_row_from_mapping(cleaned, f"{path.name}:{number}"))
     except OSError as err:
         raise DatasetFormatError(f"cannot read {path}: {err.strerror or err}") from err
+    except csv.Error as err:
+        raise DatasetFormatError(f"{path.name}: malformed CSV: {err}") from err
+    except UnicodeDecodeError as err:
+        raise DatasetFormatError(f"{path.name}: not valid UTF-8 ({err.reason})") from err
     if not rows:
         raise DatasetFormatError(f"{path.name}: no data rows")
     return Dataset(rows)
@@ -97,6 +109,8 @@ def _load_jsonl(path: Path) -> Dataset:
                 rows.append(_row_from_mapping(cleaned, where))
     except OSError as err:
         raise DatasetFormatError(f"cannot read {path}: {err.strerror or err}") from err
+    except UnicodeDecodeError as err:
+        raise DatasetFormatError(f"{path.name}: not valid UTF-8 ({err.reason})") from err
     if not rows:
         raise DatasetFormatError(f"{path.name}: no data rows")
     return Dataset(rows)

@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 
-from .types import Dataset, Finding, Severity
+from .types import Dataset, Finding, Row, Severity
 
 
 @dataclass(frozen=True)
@@ -86,11 +86,30 @@ def fleiss_kappa(label_sets: list[list[str]]) -> float | None:
     return (p_bar - p_e) / (1 - p_e)
 
 
+def _one_label_per_annotator(rows: list[Row]) -> list[str]:
+    """Labels for one item, counting each named annotator once.
+
+    Agreement is between *different* raters: an annotator who labelled the
+    same item twice would otherwise agree with themselves and inflate both
+    observed agreement and kappa. Their first label is kept. Rows without an
+    annotator name cannot be told apart and each count as one rater.
+    """
+    seen: set[str] = set()
+    labels = []
+    for row in rows:
+        if row.annotator is not None:
+            if row.annotator in seen:
+                continue
+            seen.add(row.annotator)
+        labels.append(row.label)
+    return labels
+
+
 def analyse(dataset: Dataset) -> AgreementReport:
     label_sets = []
     disagreements = []
     for item_id, rows in dataset.items.items():
-        labels = [row.label for row in rows]
+        labels = _one_label_per_annotator(rows)
         if len(labels) >= 2:
             label_sets.append(labels)
             if len(set(labels)) > 1:

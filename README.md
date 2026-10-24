@@ -5,20 +5,20 @@ annotator disagreement, class imbalance, duplicate items across splits, and
 label leakage. Zero runtime dependencies — Python 3.10+ and nothing else.
 
 ```console
-$ label-audit data/train.csv
-812 items (1,624 annotation rows), 3 labels, splits: train, test
+$ label-audit examples/reviews.csv
+10 items (10 annotation rows), 2 labels, splits: train, test
 annotators: priya, marco
-agreement: 87.4% observed over 812 multi-annotated items, Fleiss' kappa 0.71
-split train: spam=610, ham=150, promo=2
-split test: spam=48, ham=50, promo=0
+split train: negative=3, positive=5
+split test: negative=1, positive=1
 
-ERROR   [imbalance] split 'test' contains no example of 1 label(s); anything
-        evaluated on it is blind to those classes
-          - promo
-ERROR   [duplicates] 3 duplicate group(s) span more than one split; evaluation
-        on the contaminated split measures memorisation, not generalisation
-          - itm-104/itm-9central in splits test/train
+ERROR   [duplicates] 1 duplicate group(s) carry conflicting labels; at least one of each pair is wrong
+          - r4/r5: negative/positive
+ERROR   [duplicates] 1 duplicate group(s) span more than one split; evaluation on the contaminated split measures memorisation, not generalisation
+          - r1/r2 in splits test/train
+info    [agreement] no item carries more than one annotation; annotator agreement cannot be measured
 ```
+
+(Real output for the committed example file; exit code 3.)
 
 ## Why these four checks
 
@@ -42,7 +42,10 @@ Every one of them produces a model that *looks* fine and isn't:
 ## Input format
 
 CSV (with header) or JSON Lines. Required fields: `id`, `text`, `label`.
-Optional: `split` (defaults to `train`), `annotator`. Every other column is
+Optional: `split` (defaults to `train`), `annotator`. Agreement counts each
+named annotator once per item (their first label), so a repeated annotation
+cannot agree with itself. A header that repeats a column name, non-UTF-8 input
+and CSV fields over 128 KiB are rejected with exit code 1. Every other column is
 treated as a feature and inspected for leakage. One row per annotation — an
 item labelled by three annotators appears on three rows sharing the same `id`.
 
@@ -68,6 +71,17 @@ input or usage, `3` findings at or above `--fail-on` (default: `error`).
   modal, fixed rater count per item); otherwise the report says why not
   rather than printing a misleading number.
 
+## Install
+
+Not published on PyPI; install from a clone (Python 3.10+, no runtime
+dependencies):
+
+```console
+git clone https://github.com/hellpuffyt/label-audit && cd label-audit
+python -m venv .venv && . .venv/bin/activate
+pip install .
+```
+
 ## Development
 
 ```console
@@ -76,5 +90,9 @@ pytest             # test suite
 ruff check .       # lint
 mypy               # strict type check
 ```
+
+Fleiss' kappa is checked against the published worked example (0.210) in
+`tests/test_agreement.py`. Security: [SECURITY.md](SECURITY.md); audit evidence:
+[docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).
 
 MIT licensed.
