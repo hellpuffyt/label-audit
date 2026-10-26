@@ -2,7 +2,15 @@
 
 Audit a labelled dataset for the four problems that quietly ruin models:
 annotator disagreement, class imbalance, duplicate items across splits, and
-label leakage. Zero runtime dependencies — Python 3.10+ and nothing else.
+label leakage. Zero runtime dependencies: Python 3.10+ and nothing else.
+
+**Status:** version 0.1.0, not on PyPI. CI runs the tests on Linux, macOS and
+Windows with Python 3.10 to 3.13, plus ruff, strict mypy, a 95% coverage floor
+and an end-to-end run on the bundled example.
+
+<img src="docs/screenshots/audit-example-reviews.png" width="100%" alt="Terminal capture of label-audit on examples/reviews.csv: a summary of 10 items, two annotators and per-split label counts, then two ERROR findings for duplicates with conflicting labels (r4/r5) and duplicates spanning test and train (r1/r2), and an info note that agreement cannot be measured.">
+
+*Terminal capture of a real run on the committed example file. The same output as text:*
 
 ```console
 $ label-audit examples/reviews.csv
@@ -24,29 +32,39 @@ info    [agreement] no item carries more than one annotation; annotator agreemen
 
 Every one of them produces a model that *looks* fine and isn't:
 
-- **Disagreement** — if annotators cannot agree on a label, the "ground
-  truth" is noise, and accuracy against it is a measurement of nothing.
-  Reported as pairwise observed agreement plus Fleiss' kappa over the items
-  that genuinely carry multiple annotations.
-- **Imbalance** — a 100:1 split trains a majority-class detector. Reported
+- **Disagreement.** If annotators cannot agree on a label, the "ground
+  truth" is noise, and accuracy against it measures nothing. Reported as
+  pairwise observed agreement plus Fleiss' kappa over the items that carry
+  multiple annotations.
+- **Imbalance.** A 100:1 split trains a majority-class detector. Reported
   per split, against the full label vocabulary, so a class missing from the
   test split is caught too.
-- **Duplicates across splits** — a test item whose text also sits in train is
+- **Duplicates across splits.** A test item whose text also sits in train is
   measuring memorisation. Texts are compared after mild normalisation only
   (casefold + whitespace), so genuinely different texts are never merged.
-- **Label leakage** — a feature column that determines the label (a source
+- **Label leakage.** A feature column that determines the label (a source
   system, a routing tag) will be what the model learns. Columns whose values
   recur and predict the label ≥99% are errors; identifier-like columns are
   reported separately as advice, not leakage.
 
+Severity thresholds, from the source:
+
+| Check | warning | error |
+| --- | --- | --- |
+| agreement | Fleiss' kappa below 0.6 | kappa below 0.2 |
+| imbalance | majority:minority ratio of 10:1 or more | 100:1 or more, or a label with no examples in a split |
+| duplicates | | identical normalised text with conflicting labels, or across splits |
+| leakage | | a feature value predicts the label in ≥99% of covered items |
+
 ## Input format
 
-CSV (with header) or JSON Lines. Required fields: `id`, `text`, `label`.
+CSV with a header row (`.csv`) or JSON Lines (`.jsonl` or `.ndjson`); the file
+extension selects the parser. Required fields: `id`, `text`, `label`.
 Optional: `split` (defaults to `train`), `annotator`. Agreement counts each
 named annotator once per item (their first label), so a repeated annotation
 cannot agree with itself. A header that repeats a column name, non-UTF-8 input
 and CSV fields over 128 KiB are rejected with exit code 1. Every other column is
-treated as a feature and inspected for leakage. One row per annotation — an
+treated as a feature and inspected for leakage. Use one row per annotation: an
 item labelled by three annotators appears on three rows sharing the same `id`.
 
 ## Usage
@@ -56,20 +74,27 @@ label-audit data.csv                      # human-readable audit
 label-audit data.jsonl --format json      # machine-readable, same content
 label-audit data.csv --check leakage      # one auditor only (repeatable)
 label-audit data.csv --fail-on warning    # stricter CI gate
+label-audit data.csv --fail-on never      # report only, always exit 0
+python -m label_audit --version           # same CLI as a module
 ```
 
+`--check` filters the findings that are printed and counted for the exit code;
+the summary lines at the top are always shown.
+
 Exit codes are the CI interface: `0` clean at the chosen threshold, `1` bad
-input or usage, `3` findings at or above `--fail-on` (default: `error`).
+input (unreadable, unsupported or malformed file), `2` invalid command-line
+arguments (from argparse), `3` findings at or above `--fail-on` (default:
+`error`).
 
 ## What it deliberately does not do
 
-- No fuzzy/semantic duplicate detection — near-duplicate judgement calls
+- No fuzzy or semantic duplicate detection. Near-duplicate judgement calls
   belong to a human, and a merge the tool cannot justify is worse than a miss.
 - No automatic "fixing". The output is a review manifest; deleting data is
   a decision, not a side effect.
-- Cohen's/Fleiss' kappa is only computed where its assumptions hold (a
-  modal, fixed rater count per item); otherwise the report says why not
-  rather than printing a misleading number.
+- Fleiss' kappa is only computed where its assumptions hold (over the items
+  sharing the most common rater count); otherwise the report says why not
+  rather than printing a misleading number. Cohen's kappa is not computed.
 
 ## Install
 
@@ -86,13 +111,17 @@ pip install .
 
 ```console
 pip install -e ".[dev]"
-pytest             # test suite
+pytest             # 118 tests
 ruff check .       # lint
 mypy               # strict type check
+pytest --cov --cov-fail-under=95   # the coverage floor CI enforces
 ```
 
 Fleiss' kappa is checked against the published worked example (0.210) in
-`tests/test_agreement.py`. Security: [SECURITY.md](SECURITY.md); audit evidence:
+`tests/test_agreement.py`. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening
+a pull request. Security reports: [SECURITY.md](SECURITY.md). Audit evidence:
 [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).
 
-MIT licensed.
+## License
+
+MIT. See [LICENSE](LICENSE).
